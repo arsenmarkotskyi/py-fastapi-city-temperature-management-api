@@ -6,7 +6,11 @@ class City(Base):
     __tablename__ = "cities"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True)
-    additional_info = Column(String, index=True)
+    name = Column(String, index=True, max_length=100)
+    additional_info = Column(String, nullable=True)
 
-    temperatures = relationship("Temperature", back_populates="city")
+    temperatures = relationship(
+        "Temperature", 
+        back_populates="city",
+        cascade="all, delete-orphan"
+    )

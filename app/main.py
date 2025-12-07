@@ -1,5 +1,5 @@
-from fastapi import FastAPI, Request
-from fastapi.exceptions import RequestValidationError, HTTPException
+from fastapi import FastAPI, HTTPException
+from fastapi.exceptions import RequestValidationError
 
 from app.routers import cities, temperatures
 from app.database import engine, Base
@@ -8,6 +8,7 @@ from app.exceptions import (
     validation_exception_handler,
     general_exception_handler
 )
+from app.services.weather_service import close_http_client
 
 app = FastAPI(
     title="City Temperature Management API",
@@ -48,9 +49,13 @@ async def startup():
 @app.on_event("shutdown")
 async def shutdown():
     """
-    Closes database connections on application shutdown.
+    Closes database connections and HTTP client on application shutdown.
+    
+    Note: In SQLAlchemy 2.0+, AsyncEngine.dispose() is awaitable.
+    For older versions, use engine.sync_engine.dispose() instead.
     """
     await engine.dispose()
+    await close_http_client()
 
 
 # Register error handlers

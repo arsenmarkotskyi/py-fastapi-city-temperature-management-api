@@ -1,4 +1,4 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -88,7 +88,7 @@ async def delete_city(city_id: int, db: AsyncSession = Depends(get_db)):
         raise not_found_error("City", city_id)
     
     try:
-        await db.delete(db_city)
+        db.delete(db_city)
         await db.commit()
     except Exception as e:
         await db.rollback()

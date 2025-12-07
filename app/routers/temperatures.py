@@ -1,8 +1,9 @@
 import asyncio
 from datetime import datetime
 from typing import Optional
+import logging
 
-from fastapi import APIRouter, Depends, HTTPException, Query
+from fastapi import APIRouter, Depends, Query
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -12,6 +13,8 @@ from app.models.temperature import Temperature as TemperatureModel
 from app.schemas.temperature import Temperature
 from app.services.weather_service import get_temperature_for_city as fetch_temperature
 from app.exceptions import not_found_error, bad_request_error
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -29,7 +32,7 @@ async def update_temperatures(
     - If `city_id` is specified: updates temperature only for the specified city
     """
     # Get cities from database
-    if city_id:
+    if city_id is not None:
         # Update temperature only for specific city
         result = await db.execute(select(City).where(City.id == city_id))
         city = result.scalar_one_or_none()
@@ -47,12 +50,25 @@ async def update_temperatures(
             raise not_found_error("Cities")
     
     # Fetch temperature for all cities in parallel
+    # Use return_exceptions=True to ensure one failing call doesn't cancel the whole update
     temperature_tasks = [fetch_temperature(city.name) for city in cities]
-    temperatures = await asyncio.gather(*temperature_tasks)
+    temperature_results = await asyncio.gather(*temperature_tasks, return_exceptions=True)
     
-    # Create temperature records for each city
+    # Process results and handle exceptions
     created_temperatures = []
-    for city, temperature in zip(cities, temperatures):
+    for city, result in zip(cities, temperature_results):
+        # Handle exceptions that weren't caught by the service
+        if isinstance(result, Exception):
+            logger.error(f"Unexpected exception for {city.name}: {result}")
+            created_temperatures.append({
+                "city_id": city.id,
+                "city_name": city.name,
+                "temperature": None,
+                "error": f"Exception: {str(result)}"
+            })
+            continue
+        
+        temperature = result
         if temperature is not None:  # Skip cities for which temperature could not be fetched
             db_temperature = TemperatureModel(
                 city_id=city.id,
@@ -74,7 +90,13 @@ async def update_temperatures(
                 "error": "Failed to fetch temperature"
             })
     
-    await db.commit()
+    # Commit database changes with error handling
+    try:
+        await db.commit()
+    except Exception as e:
+        await db.rollback()
+        logger.error(f"Database commit failed: {e}")
+        raise bad_request_error(f"Error saving temperatures to database: {str(e)}")
     
     return {
         "message": "Temperatures updated successfully",
