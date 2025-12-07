@@ -1,6 +1,7 @@
 import httpx
 from typing import Optional
 import logging
+from urllib.parse import quote_plus
 
 logger = logging.getLogger(__name__)
 
@@ -47,7 +48,9 @@ async def get_temperature_for_city(city_name: str) -> Optional[float]:
         # Use reusable HTTP client for better performance
         client = get_http_client()
         # URL for wttr.in API (free, no API key required)
-        url = f"https://wttr.in/{city_name}?format=j1"
+        # URL-encode city name to handle spaces and special characters
+        encoded_city_name = quote_plus(city_name)
+        url = f"https://wttr.in/{encoded_city_name}?format=j1"
         response = await client.get(url)
         response.raise_for_status()  # Raises exception for HTTP errors
         

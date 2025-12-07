@@ -115,7 +115,7 @@ async def get_temperatures(
     Gets a list of all temperature records.
     Can be filtered by city_id through query parameter.
     """
-    if city_id:
+    if city_id is not None:
         # Filter by city_id
         result = await db.execute(
             select(TemperatureModel).where(TemperatureModel.city_id == city_id)

@@ -6,7 +6,7 @@ class City(Base):
     __tablename__ = "cities"
 
     id = Column(Integer, primary_key=True, index=True)
-    name = Column(String, index=True, max_length=100)
+    name = Column(String(100), index=True)
     additional_info = Column(String, nullable=True)
 
     temperatures = relationship(
